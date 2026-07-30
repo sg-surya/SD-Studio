@@ -240,6 +240,12 @@ app.use('/api', async (req: Request, res: Response, next) => {
   }
 });
 
+app.use((req: Request, res: Response) => {
+  if (req.path.startsWith('/api')) {
+    res.status(404).json({ success: false, error: `API endpoint not found: ${req.method} ${req.path}` });
+  }
+});
+
 if (!process.env.VERCEL) {
   const port = Number(process.env.NOTIFICATION_PORT || 5001);
   app.listen(port, () => {
