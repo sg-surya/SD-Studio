@@ -31,11 +31,14 @@ async function readApiResponse(res: Response) {
   throw new Error(`Payment server returned ${res.status || 'an invalid response'}. Check Vercel function logs.`);
 }
 
+let sdkLoadPromise: Record<string, Promise<any>> = {};
+
 function loadCashfreeSdk(mode: string): Promise<any> {
-  return new Promise((resolve, reject) => {
-    if ((window as any).Cashfree) {
-      return resolve((window as any).Cashfree);
-    }
+  if (sdkLoadPromise[mode]) return sdkLoadPromise[mode];
+
+  sdkLoadPromise[mode] = new Promise((resolve, reject) => {
+    delete (window as any).Cashfree;
+
     const script = document.createElement('script');
     script.src = mode === 'production'
       ? 'https://sdk.cashfree.com/js/v3/cashfree.js'
@@ -45,9 +48,14 @@ function loadCashfreeSdk(mode: string): Promise<any> {
       if ((window as any).Cashfree) resolve((window as any).Cashfree);
       else reject(new Error('Cashfree SDK loaded but global not found'));
     };
-    script.onerror = () => reject(new Error('Failed to load Cashfree SDK'));
+    script.onerror = () => {
+      delete sdkLoadPromise[mode];
+      reject(new Error('Failed to load Cashfree SDK'));
+    };
     document.body.appendChild(script);
   });
+
+  return sdkLoadPromise[mode];
 }
 
 export default function Checkout({ isOpen, items, onClose, onComplete }: { isOpen: boolean; items: CartItem[]; onClose: () => void; onComplete: (o: Order) => void }) {

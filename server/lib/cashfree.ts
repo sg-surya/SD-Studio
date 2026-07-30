@@ -38,17 +38,34 @@ function isLocalHostname(hostname: string) {
   );
 }
 
+function detectKeyMode(): CashfreeMode {
+  if (!SECRET_KEY) return 'sandbox';
+  return SECRET_KEY.includes('_prod_') ? 'production' : 'sandbox';
+}
+
 function getRuntime(origin?: string): { mode: CashfreeMode; baseUrl: string } {
   const hostname = getHostname(origin);
   const localRequest = isLocalHostname(hostname);
-  const wantProduction = CASHFREE_MODE === 'production';
+  const configuredMode = CASHFREE_MODE as CashfreeMode;
+  const keyMode = detectKeyMode();
 
-  if (localRequest && wantProduction && !ALLOW_LOCAL_PRODUCTION) {
+  if (configuredMode !== keyMode) {
+    console.warn(
+      `Cashfree mode mismatch: CASHFREE_MODE="${configuredMode}" but key is ${keyMode}. Using "${keyMode}".`
+    );
+  }
+
+  const effectiveMode: CashfreeMode = keyMode;
+
+  if (localRequest && effectiveMode === 'production' && !ALLOW_LOCAL_PRODUCTION) {
+    console.warn('Localhost production blocked. Set CASHFREE_ALLOW_LOCAL_PRODUCTION=true to allow.');
     return { mode: 'sandbox', baseUrl: SANDBOX_BASE_URL };
   }
 
-  const mode: CashfreeMode = wantProduction ? 'production' : 'sandbox';
-  return { mode, baseUrl: mode === 'production' ? PRODUCTION_BASE_URL : SANDBOX_BASE_URL };
+  return {
+    mode: effectiveMode,
+    baseUrl: effectiveMode === 'production' ? PRODUCTION_BASE_URL : SANDBOX_BASE_URL,
+  };
 }
 
 function getSafeBaseUrl(origin?: string): string {
